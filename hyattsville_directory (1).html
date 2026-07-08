@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hyattsville Business Directory</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f6f9;overflow:hidden}
+  .shell{display:flex;flex-direction:column;height:100vh}
+  .header{background:#1a2744;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .header h1{font-size:15px;font-weight:600;letter-spacing:.3px;margin:0}
+  .tabs{display:flex;background:#1a2744;border-top:1px solid #2d3a5c;flex-shrink:0}
+  .tab{padding:7px 16px;color:#8a9cc5;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;user-select:none}
+  .tab.active{color:#fff;border-bottom-color:#5b9bd5}
+  #map{width:100%;height:300px;flex-shrink:0;z-index:0}
+  .filters{display:flex;flex-wrap:wrap;background:#fff;border-bottom:1px solid #dde3ee;flex-shrink:0}
+  .f-wrap{position:relative;border-right:1px solid #dde3ee}
+  .f-btn{background:#fff;border:none;padding:8px 12px;font-size:12px;color:#333;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .f-btn.on{background:#eef3fb;color:#1a2744;font-weight:600}
+  .plus{color:#1a2744;font-weight:700;font-size:13px}
+  .dd{display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid #dde3ee;border-radius:4px;z-index:1000;min-width:180px;box-shadow:0 3px 12px rgba(0,0,0,.12);max-height:220px;overflow-y:auto}
+  .dd.open{display:block}
+  .dd input{width:100%;padding:6px 10px;border:none;border-bottom:1px solid #eee;font-size:12px;outline:none}
+  .opt{padding:6px 12px;font-size:12px;cursor:pointer;color:#333}
+  .opt:hover,.opt.sel{background:#eef3fb;color:#1a2744}
+  .rbar{background:#f0f4fa;padding:4px 12px;font-size:11.5px;color:#1a2744;font-weight:500;border-bottom:1px solid #dde3ee;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+  .clr{font-size:11px;color:#5b9bd5;cursor:pointer;background:none;border:none;padding:2px 6px}
+  .tbl-wrap{overflow-y:auto;flex:1}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{background:#f7f9fc;color:#1a2744;font-weight:500;padding:7px 8px;text-align:left;border-bottom:2px solid #dde3ee;position:sticky;top:0;z-index:5;white-space:nowrap;font-size:11.5px}
+  thead th:nth-child(1){width:58px}
+  thead th:nth-child(2){width:160px}
+  thead th:nth-child(3){width:130px}
+  thead th:nth-child(4){width:140px}
+  thead th:nth-child(5){width:110px}
+  thead th:nth-child(6){width:100px}
+  thead th:nth-child(7){width:120px}
+  thead th:nth-child(8){width:auto}
+  tbody tr{border-bottom:.5px solid #eee;cursor:pointer}
+  tbody tr:hover{background:#f0f6ff}
+  tbody tr.hl{background:#d4e4f7!important}
+  td{padding:6px 8px;vertical-align:middle;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  td.wrap{white-space:normal}
+  td a{color:#2563a8;text-decoration:none;font-size:11px}
+  td a:hover{text-decoration:underline}
+  .ic{width:58px;padding:4px 6px}
+  .ib{width:48px;height:36px;border-radius:3px;overflow:hidden;background:#e8eef8;position:relative;display:block;flex-shrink:0}
+  .ib img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .2s;position:absolute;inset:0}
+  .ib img.loaded{opacity:1}
+  .ib .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:7.5px;color:#aaa;text-align:center;padding:2px;line-height:1.2;pointer-events:none}
+  .badge{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10.5px;white-space:nowrap}
+  .bb{background:#e8eef8;color:#1a2744}
+  .ba{background:#f3e8f8;color:#5a1a7a}
+  .pop-img{width:100%;height:80px;object-fit:cover;border-radius:4px;margin-bottom:5px;display:block}
+  .sbar{background:#fff8e1;border-bottom:1px solid #ffe082;padding:4px 12px;font-size:11px;color:#795548;display:none;flex-shrink:0}
+  .sbar.on{display:block}
+  /* fix Webflow global img max-width bleeding into tiles */
+  #map img{max-width:none!important;max-height:none!important;box-shadow:none!important}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="header">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <h1>Hyattsville Business Directory</h1>
+    <span id="src-label" style="margin-left:auto;font-size:10px;opacity:.6">loading…</span>
+  </div>
+  <div class="tabs">
+    <div class="tab active" id="tab-biz" onclick="switchTab('biz')">🏪 Businesses (<span id="biz-count">—</span>)</div>
+    <div class="tab" id="tab-art" onclick="switchTab('art')">🎨 Public Art (<span id="art-count">—</span>)</div>
+  </div>
+  <div id="map"></div>
+  <div class="sbar" id="sbar"></div>
+
+  <div class="filters" id="biz-filters">
+    <div class="f-wrap">
+      <button class="f-btn" id="fb-name" onclick="toggleDD('name',event)">Business Name <span class="plus">+</span>
+        <div class="dd" id="dd-name" onclick="event.stopPropagation()"><input id="name-inp" type="text" placeholder="Search…" oninput="applyFilters()"></div>
+      </button>
+    </div>
+    <div class="f-wrap"><button class="f-btn" id="fb-area" onclick="toggleDD('area',event)">Area <span class="plus">+</span><div class="dd" id="dd-area"></div></button></div>
+    <div class="f-wrap"><button class="f-btn" id="fb-type" onclick="toggleDD('type',event)">Business Type <span class="plus">+</span><div class="dd" id="dd-type"></div></button></div>
+    <div class="f-wrap"><button class="f-btn" id="fb-svc" onclick="toggleDD('svc',event)">Service Options <span class="plus">+</span><div class="dd" id="dd-svc"></div></button></div>
+  </div>
+  <div class="filters" id="art-filters" style="display:none">
+    <div class="f-wrap">
+      <button class="f-btn" id="fb-artist" onclick="toggleDD('artist',event)">Artist <span class="plus">+</span>
+        <div class="dd" id="dd-artist" onclick="event.stopPropagation()"><input id="artist-inp" type="text" placeholder="Search…" oninput="applyFilters()"></div>
+      </button>
+    </div>
+    <div class="f-wrap"><button class="f-btn" id="fb-medium" onclick="toggleDD('medium',event)">Medium <span class="plus">+</span><div class="dd" id="dd-medium"></div></button></div>
+  </div>
+
+  <div class="rbar">
+    <span id="rcount">Loading…</span>
+    <button class="clr" onclick="clearFilters()">Clear filters</button>
+  </div>
+  <div class="tbl-wrap" id="tbl-wrap">
+    <table id="main-table"><colgroup id="main-colgroup"><col><col><col><col><col><col><col><col></colgroup>
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+// =============================================================================
+// CONFIG — replace with your Google Sheets published CSV URLs
+// File → Share → Publish to web → select tab → CSV → copy URL
+// =============================================================================
+var CFG = {
+  BIZ_URL: 'https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv&gid=YOUR_BIZ_GID',
+  ART_URL: 'https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/export?format=csv&gid=YOUR_ART_GID',
+  BIZ_COLS: {img:0,name:1,area:2,addr:3,lat:4,lng:5,phone:6,type:7,url:8,services:9},
+  ART_COLS: {img:0,artist:1,title:2,medium:3,addr:7,lat:8,lng:9,year:11}
+};
+
+// =============================================================================
+// FALLBACK DATA
+// =============================================================================
+var FB_BIZ=[
+  {img:"https://cdn.usarestaurants.info/assets/uploads/7f4cd71cf77668c41599e1c07b65b489_-united-states-maryland-prince-georges-county-16-hyattsville-hyattsville-998212-chez-diorhtm.jpg",name:"Chez Dior",area:"Route One",addr:"5331 Baltimore Ave",lat:38.95222,lng:-76.94083,phone:"(240) 696-5907",type:"Senegalese",url:"https://www.facebook.com/p/Restaurant-Chez-Dior-100063601598701/",services:"Dine-In, Take-Out, Delivery"},
+  {img:"https://media-cdn.grubhub.com/image/upload/d_search:browse-images:default.jpg/w_400,q_auto,fl_lossy,dpr_auto,c_fill,f_auto,h_300,g_auto/xne8i5k1zqgudpxpvzdi",name:"Shagga Coffee & Restaurant",area:"Route One",addr:"6040 Baltimore Ave",lat:38.96131,lng:-76.93986,phone:"(240) 296-3030",type:"Ethiopian",url:"https://shaggarestaurant.com/",services:"Dine-In, Bar, Take-Out"},
+  {img:"https://media-cdn.tripadvisor.com/media/photo-s/0e/cb/57/86/maryland-crabcake.jpg",name:"Franklin's Restaurant and Brewery",area:"Route One",addr:"5123 Baltimore Ave",lat:38.95262,lng:-76.94031,phone:"(301) 927-2740",type:"Brewpub",url:"https://franklinsbrewery.com/",services:"Take-Out, Catering"},
+  {img:"https://s3-media0.fl.yelpcdn.com/bphoto/DiUEzhbdONETLGWw9K-S4Q/348s.jpg",name:"Prime Restaurant",area:"Route One",addr:"5126 Baltimore Ave",lat:38.95338,lng:-76.94045,phone:"(240) 615-8629",type:"African",url:"https://www.facebook.com/suya22/",services:"Dine-In, Bar"},
+  {img:"https://s3-media0.fl.yelpcdn.com/bphoto/0VGceQPXjgiCgvb3HB1dNQ/348s.jpg",name:"Vigilante Coffee",area:"Route One",addr:"4327 Gallatin St",lat:38.95245,lng:-76.94094,phone:"(301) 200-3110",type:"Coffee",url:"https://www.vigilantecoffee.com/",services:"Dine-In, Take-Out"},
+  {img:"https://betweenthebreadcafemd.com/wp-content/uploads/2023/02/IMG_8155-3-scaled.jpg",name:"Between the Bread Cafe",area:"Route One",addr:"5105 Baltimore Ave",lat:38.95222,lng:-76.94048,phone:"(301) 910-0733",type:"Coffee",url:"https://betweenthebreadcafemd.com/",services:"Take-Out, Delivery"},
+  {img:"",name:"Chipotle Mexican Grill",area:"Route One",addr:"5501 Baltimore Ave #101",lat:38.95566,lng:-76.93991,phone:"(301) 927-2484",type:"Latin American",url:"https://www.chipotle.com/",services:"Dine-In, Take-Out, Catering"},
+  {img:"",name:"Elevation Burger",area:"Route One",addr:"5501 Baltimore Ave #105",lat:38.95545,lng:-76.93968,phone:"(301) 985-6869",type:"Burger",url:"https://www.elevationburger.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Spice 6",area:"Route One",addr:"5501 Baltimore Ave #107",lat:38.95566,lng:-76.93991,phone:"(301) 209-0080",type:"Indian",url:"https://www.spice-6.com/",services:"Dine-In, Take-Out, Catering"},
+  {img:"https://www.busboysandpoets.com/wp-content/themes/busboys/dist/images/event_ph1.jpg",name:"Busboys and Poets",area:"Route One",addr:"5331 Baltimore Ave",lat:38.95499,lng:-76.93995,phone:"(301) 779-2787",type:"Coffee",url:"https://www.busboysandpoets.com/",services:"Dine-In, Bar, Take-Out"},
+  {img:"",name:"Tara Thai",area:"Route One",addr:"5501 Baltimore Ave #104",lat:38.95568,lng:-76.93991,phone:"(301) 277-7888",type:"Asian",url:"http://tarathai.com/homepage/hyattsville/",services:"Take-Out, Delivery, Catering"},
+  {img:"",name:"Pizzeria Paradiso",area:"Route One",addr:"4800 Rhode Island Ave",lat:38.94871,lng:-76.94394,phone:"(240) 467-3210",type:"Pizza",url:"https://www.eatyourpizza.com/",services:"Dine-In, Bar, Take-Out, Delivery"},
+  {img:"",name:"Maryland Meadworks",area:"Route One",addr:"4700 Rhode Island Ave #B",lat:38.94693,lng:-76.94564,phone:"(301) 955-9644",type:"Meadery",url:"https://www.marylandmeadworks.com/",services:"Bar, Dine-In, Take-Out"},
+  {img:"https://s3-us-west-1.amazonaws.com/wp.uploads.wamu.org/uploads/sites/3/2018/08/Streetcar208220Outside.jpg",name:"Streetcar 82 Brewing",area:"Route One",addr:"4824 Rhode Island Ave",lat:38.94948,lng:-76.94301,phone:"(240) 782-0152",type:"Brewery Bar",url:"https://www.streetcar82brewing.com/",services:"Bar, Take-Out"},
+  {img:"",name:"Kingston Arbor Restaurant",area:"The Mall at Prince George's",addr:"3500 E-West Hwy",lat:38.96871,lng:-76.95731,phone:"(301) 853-0132",type:"Jamaican",url:"https://www.yelp.com/biz/kingston-arbor-hyattsville",services:"Dine-In, Take-Out"},
+  {img:"",name:"Olive Garden",area:"The Mall at Prince George's",addr:"3480 E-West Hwy",lat:38.96727,lng:-76.9585,phone:"(301) 853-0289",type:"Italian",url:"https://www.olivegarden.com/",services:"Dine-In, Take-Out, Bar, Catering"},
+  {img:"",name:"Miller's Ale House",area:"The Mall at Prince George's",addr:"3430 E-West Hwy",lat:38.96731,lng:-76.9603,phone:"(240) 898-4052",type:"Bar",url:"https://millersalehouse.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"&Pizza",area:"The Mall at Prince George's",addr:"3500 E-West Hwy #1250",lat:38.96798,lng:-76.95696,phone:"(202) 335-5991",type:"Pizza",url:"https://andpizza.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Mezeh Mediterranean Grill",area:"The Mall at Prince George's",addr:"3500 E-West Hwy #1270",lat:38.96831,lng:-76.95746,phone:"(301) 761-1890",type:"Mediterranean",url:"https://mezeh.com/",services:"Dine-In, Take-Out, Catering"},
+  {img:"",name:"Five Guys",area:"The Mall at Prince George's",addr:"3500 E-West Hwy #1280",lat:38.96794,lng:-76.95648,phone:"(301) 955-9160",type:"Burgers",url:"https://www.fiveguys.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Ghana Jollof",area:"The Mall at Prince George's",addr:"3500 East-West Hwy",lat:38.96835,lng:-76.9555,phone:"(301) 996-1400",type:"African",url:"https://www.myghanajollof.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Popeye's",area:"The Mall at Prince George's",addr:"3500 East-West Hwy",lat:38.96835,lng:-76.9555,phone:"(240) 324-8333",type:"Fast Food",url:"https://www.popeyes.com/",services:"Dine-In, Take-Out, Delivery"},
+  {img:"",name:"McDonald's",area:"The Mall at Prince George's",addr:"3500 East-West Hwy",lat:38.96835,lng:-76.9555,phone:"(301) 559-7985",type:"Fast Food",url:"https://www.mcdonalds.com/",services:"Dine-In, Take-Out, Delivery"},
+  {img:"",name:"Huncho House",area:"University Town Center",addr:"6451 America Blvd #101",lat:38.96765,lng:-76.95208,phone:"(240) 764-6371",type:"American",url:"https://www.hunchohouse.com/",services:"Dine-In, Takeout"},
+  {img:"",name:"Bonchon",area:"University Town Center",addr:"6507 America Blvd",lat:38.9688,lng:-76.95182,phone:"(301) 209-1888",type:"Korean",url:"https://bonchon.com/",services:"Dine-In, Take-Out, Bar"},
+  {img:"",name:"Pollo Campero",area:"University Town Center",addr:"6401 America Blvd #190",lat:38.96822,lng:-76.95216,phone:"(301) 277-4308",type:"Peruvian",url:"https://order.campero.com/",services:"Dine-In, Delivery, Take-Out"},
+  {img:"",name:"Starbucks Coffee",area:"The Shoppes at Metro",addr:"3601 E-West Highway",lat:38.96871,lng:-76.95731,phone:"(301) 985-5244",type:"Coffee",url:"https://www.starbucks.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Wingstop",area:"The Shoppes at Metro",addr:"6211 Belcrest Rd #3",lat:38.96553,lng:-76.95333,phone:"(240) 696-5167",type:"American",url:"https://www.wingstop.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Dunkin' Donuts",area:"Metro Shops",addr:"2970 Belcrest Center Dr #112",lat:38.96614,lng:-76.95639,phone:"(301) 559-1763",type:"Coffee",url:"https://www.dunkindonuts.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Acapulco Spirit Restaurant",area:"Queens Chapel Town Center",addr:"3100 Hamilton St",lat:38.9562,lng:-76.96329,phone:"(301) 853-7910",type:"Salvadoran",url:"https://acapulcospiritrestaurant.com/",services:"Dine-In, Take-Out, Bar"},
+  {img:"",name:"Baskin-Robbins",area:"Queens Chapel Town Center",addr:"3004 Hamilton St",lat:38.95604,lng:-76.96474,phone:"(301) 559-7979",type:"Ice Cream",url:"https://www.baskinrobbins.com/",services:"Dine-In, Take-Out"},
+  {img:"",name:"Kitchen Near You",area:"Queens Chapel Town Center",addr:"5321 Ager Rd",lat:38.95508,lng:-76.96536,phone:"(301) 559-5999",type:"Nigerian",url:"https://www.facebook.com/KNURestaurant/",services:"Dine-In, Take-Out, Bar"},
+  {img:"",name:"Yes! Organic Market",area:"Route 1 Main",addr:"5331 Baltimore Ave",lat:38.95765,lng:-76.94033,phone:"301-779-1205",type:"Market",url:"https://www.yesorganicmarket.com/",services:""},
+  {img:"",name:"Aldi Grocery Store",area:"West Hyattsville",addr:"3025 Hamilton Street",lat:38.9558,lng:-76.96405,phone:"",type:"Market",url:"https://www.aldi.us/",services:""},
+  {img:"",name:"Nest Proper",area:"Route One",addr:"5303 Baltimore Ave",lat:38.95434,lng:-76.94277,phone:"(301) 277-3732",type:"Retail",url:"https://www.nestproper.com/",services:""},
+  {img:"",name:"CVS Pharmacy",area:"Prince George's Plaza Transit District",addr:"3605 East West Highway",lat:38.96611,lng:-76.95264,phone:"(301) 277-0199",type:"Pharmacy",url:"https://www.cvs.com/",services:""},
+  {img:"",name:"Giant Food Store",area:"Prince George's Plaza Transit District",addr:"3521 East West Highway",lat:38.96591,lng:-76.95874,phone:"(301) 853-3700",type:"Service",url:"https://stores.giantfood.com/",services:""},
+  {img:"",name:"Safeway",area:"University Town Center",addr:"3702 East West Highway",lat:38.96695,lng:-76.95109,phone:"(301) 955-1941",type:"Service",url:"https://local.safeway.com/",services:""},
+  {img:"",name:"Home Depot",area:"",addr:"3301 East West Highway",lat:38.9662,lng:-76.96539,phone:"(301) 891-1106",type:"Service",url:"https://www.homedepot.com/",services:""},
+  {img:"",name:"LA Fitness",area:"Prince George's Plaza Transit District",addr:"2970 Belcrest Center Drive",lat:38.96964,lng:-76.95292,phone:"(301) 559-5031",type:"Service",url:"https://www.lafitness.com/",services:""},
+  {img:"https://imagescdn.homes.com/i2/_P3b-yUUV6_DkfE4Bx8RFAJb2x1iCg0wJxlRgzEm2hU/117/chelsea-school-hyattsville-md.jpg?p=1",name:"Chelsea School",area:"",addr:"2970 Belcrest Center Dr #300",lat:38.95493,lng:-76.94554,phone:"",type:"School",url:"https://www.chelseaschool.edu/",services:""},
+  {img:"",name:"Northwestern High School",area:"",addr:"7000 Adelphi Rd",lat:38.97496,lng:-76.95967,phone:"",type:"School",url:"https://www.pgcps.org/northwestern",services:""},
+  {img:"",name:"First Baptist Church",area:"",addr:"5701 42nd Ave",lat:38.95803,lng:-76.96425,phone:"",type:"Church",url:"",services:""},
+  {img:"",name:"St Mark's Catholic Church",area:"",addr:"7501 Adelphi Rd",lat:38.98264,lng:-77.03661,phone:"",type:"Church",url:"https://stmarkhyattsville.org/",services:""}
+];
+
+var FB_ART=[
+  {img:"",artist:"Liz LaManche",title:"After Dark, Hyattsville",medium:"Mural",lat:38.9528,lng:-76.9403,addr:"5123 Baltimore Ave",year:"2013"},
+  {img:"",artist:"Bill Culbertson",title:"Muppet Dawn",medium:"Sculpture",lat:38.95202,lng:-76.95101,addr:"3911 Hamilton St",year:"2012"},
+  {img:"",artist:"Valerie Theberge",title:"Wave Mosaic at Melrose Skate Park",medium:"Mosaic Panel",lat:38.94624,lng:-76.9466,addr:"4666 41st Place",year:"2011"},
+  {img:"",artist:"Alan Binstock",title:"FutureView",medium:"Sculpture",lat:38.95208,lng:-76.94238,addr:"4314 Farragut St",year:"2015"},
+  {img:"",artist:"Alan Binstock",title:"Ribbon of Life",medium:"Sculpture",lat:38.9676,lng:-76.95201,addr:"6401 America Blvd",year:"2016"},
+  {img:"",artist:"Christopher Janney",title:"Hyattsville Horn Section",medium:"Sculpture",lat:38.95135,lng:-76.94143,addr:"5000 Rhode Island Ave",year:"2002"},
+  {img:"",artist:"Jerome Johnson",title:"Centennial Park Mural",medium:"Mural",lat:38.95385,lng:-76.94009,addr:"5215 Baltimore Ave",year:"2002"},
+  {img:"",artist:"Max Mueller",title:"Mural at Vigilante Coffee",medium:"Mural",lat:38.95241,lng:-76.94113,addr:"4327 Gallatin St",year:"2018"},
+  {img:"",artist:"Green Owl Design",title:"Move More HVL",medium:"Mural",lat:38.95418,lng:-76.93999,addr:"Hamilton St",year:"2018"},
+  {img:"",artist:"Michael Baker",title:"Trinity",medium:"Sculpture",lat:38.95764,lng:-76.94114,addr:"5711 44 Ave",year:"2011"},
+  {img:"",artist:"Valerie Theberge",title:"Mosaic Bench at Magruder Park",medium:"Mosaic Panel",lat:38.95307,lng:-76.95124,addr:"3980 Hamilton St",year:"2010"},
+  {img:"",artist:"Eugene Kingman",title:"Hyattsville Countryside",medium:"Mural",lat:38.95267,lng:-76.9415,addr:"4325 Gallatin St",year:"1938"},
+  {img:"",artist:"Arthur Kwon Lee",title:"Rockets Red Glare",medium:"Mural",lat:38.95279,lng:-76.94026,addr:"5123 Baltimore Ave",year:"2014"},
+  {img:"",artist:"Rashad Ali Muhammad",title:"I Am Not Your Target",medium:"Vinyl Wrap",lat:38.94651,lng:-76.94593,addr:"Rte 1 / Charles Armentrout",year:"2018"},
+  {img:"",artist:"Sofia Gawer-Fische",title:"The Sky's The Limit",medium:"Sculpture",lat:38.96499,lng:-76.93867,addr:"6309 Baltimore Ave",year:"2002"},
+  {img:"",artist:"Phillip Ratner",title:"Images of America",medium:"Sculpture",lat:38.97017,lng:-76.95507,addr:"Toledo Rd",year:"2003"},
+  {img:"",artist:"Art Landerman",title:"Jiffy Plumbing Mural",medium:"Mural",lat:38.94655,lng:-76.94085,addr:"4623 Baltimore Ave",year:"2016"},
+  {img:"",artist:"Daniel Culver",title:"Hurley",medium:"Sculpture",lat:38.9522,lng:-76.94164,addr:"4328 Farragut St",year:"2011"}
+];
+
+// =============================================================================
+// STATE
+// =============================================================================
+var map, bizLayer, artLayer, bizMarkers=[], artMarkers=[], hlRow=-1;
+var curTab='biz';
+var filt={name:'',area:'',type:'',svc:'',artist:'',medium:''};
+var BIZD=[], ARTD=[], filtBiz=[], filtArt=[];
+var obs;
+
+function dom(u){try{return new URL(u).hostname.replace('www.','').substring(0,28);}catch(e){return '';}}
+function uniq(a){return Array.from(new Set(a.filter(Boolean))).sort();}
+function ss(id,msg){var el=document.getElementById(id);if(el)el.textContent=msg;}
+function sbar(msg,show){var el=document.getElementById('sbar');el.textContent=msg;el.classList.toggle('on',show);}
+
+// =============================================================================
+// DATA LOAD
+// =============================================================================
+var configured = CFG.BIZ_URL.indexOf('YOUR_SHEET_ID')===-1;
+
+function loadData(){
+  if(!configured){useFallback();return;}
+  sbar('Fetching live data from Google Sheets…',true);
+  var bd=null,ad=null,be=false,ae=false;
+  function check(){
+    if(bd===null||ad===null)return;
+    if(be||ae){useFallback();return;}
+    BIZD=bd.slice(2).map(parseBiz).filter(Boolean);
+    ARTD=ad.slice(2).map(parseArt).filter(Boolean);
+    sbar('',false);
+    ss('src-label','Live • '+BIZD.length+' businesses');
+    finish();
+  }
+  Papa.parse(CFG.BIZ_URL,{download:true,header:false,skipEmptyLines:true,
+    complete:function(r){bd=r.data;check();},error:function(){be=true;bd=[];check();}});
+  Papa.parse(CFG.ART_URL,{download:true,header:false,skipEmptyLines:true,
+    complete:function(r){ad=r.data;check();},error:function(){ae=true;ad=[];check();}});
+  setTimeout(function(){if(BIZD.length===0){useFallback();}},8000);
+}
+function parseBiz(row){
+  var c=CFG.BIZ_COLS,lat=parseFloat(row[c.lat]),lng=parseFloat(row[c.lng]);
+  if(isNaN(lat)||isNaN(lng))return null;
+  return{img:row[c.img]||'',name:(row[c.name]||'').trim(),area:(row[c.area]||'').trim(),
+    addr:(row[c.addr]||'').trim(),lat:lat,lng:lng,phone:(row[c.phone]||'').trim(),
+    type:(row[c.type]||'').trim(),url:(row[c.url]||'').trim(),services:(row[c.services]||'').trim()};
+}
+function parseArt(row){
+  var c=CFG.ART_COLS,lat=parseFloat(row[c.lat]),lng=parseFloat(row[c.lng]);
+  if(isNaN(lat)||isNaN(lng))return null;
+  return{img:row[c.img]||'',artist:(row[c.artist]||'').trim(),title:(row[c.title]||'').trim(),
+    medium:(row[c.medium]||'').trim(),lat:lat,lng:lng,addr:(row[c.addr]||'').trim(),year:(row[c.year]||'').trim()};
+}
+function useFallback(){
+  BIZD=FB_BIZ; ARTD=FB_ART;
+  sbar('',false);
+  ss('src-label',BIZD.length+' businesses');
+  finish();
+}
+function finish(){
+  filtBiz=BIZD.slice(); filtArt=ARTD.slice();
+  ss('biz-count',BIZD.length); ss('art-count',ARTD.length);
+  buildDDs(); applyFilters();
+}
+
+// =============================================================================
+// MAP — initialized AFTER window load so dimensions are settled
+// =============================================================================
+var AC={'Route One':'#C62828','Route 1 Main':'#D84315','Route 1 Alternate':'#E64A19',
+  "The Mall at Prince George's":'#1565C0','The Mall at PG':'#1565C0',
+  'University Town Center':'#00695C','PG Metro':'#283593',
+  "Prince George's Plaza Transit District":'#283593',
+  'Arts District Hyattsville (East)':'#AD1457','Arts District Hyattsville (West)':'#AD1457',
+  'West Hyattsville':'#558B2F','West Hyattsville Transit District':'#558B2F',
+  'Queens Chapel Town Center':'#F57F17','Queens Chapel':'#F57F17',
+  'Historic Hyattsville':'#6D4C41','Hyattsville Historic District':'#6D4C41',
+  'Hamilton & 38TH St':'#795548','Metro Shops':'#546E7A','The Shoppes at Metro':'#546E7A',
+  'Giant Shopping Center':'#0277BD','40TH Avenue':'#00838F'};
+function pc(a){return AC[a]||'#546E7A';}
+
+function initMap(){
+  var el=document.getElementById('map');
+  map=L.map(el,{zoomControl:true,preferCanvas:false}).setView([38.958,-76.949],13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains:'abcd',maxZoom:19,crossOrigin:true
+  }).addTo(map);
+  bizLayer=L.markerClusterGroup({iconCreateFunction:function(c){return cIcon(c,'#C62828');},maxClusterRadius:40});
+  artLayer=L.markerClusterGroup({iconCreateFunction:function(c){return cIcon(c,'#6A1B9A');},maxClusterRadius:40});
+  map.addLayer(bizLayer);
+  obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){var img=e.target,src=img.dataset.src;
+        if(src){img.src=src;img.onload=function(){img.classList.add('loaded');};img.onerror=function(){img.remove();};obs.unobserve(img);}
+      }
+    });
+  },{root:document.getElementById('tbl-wrap'),rootMargin:'100px'});
+  loadData();
+}
+
+function cIcon(c,col){return L.divIcon({html:'<div style="background:'+col+';color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">'+c.getChildCount()+'</div>',className:'',iconSize:[30,30]});}
+function pin(color){return L.divIcon({html:'<svg width="22" height="34" viewBox="0 0 22 34" xmlns="http://www.w3.org/2000/svg"><path d="M11 0C4.9 0 0 4.9 0 11c0 8.1 11 22 11 22s11-13.9 11-22C22 4.9 17.1 0 11 0z" fill="'+color+'"/><circle cx="11" cy="11" r="4.5" fill="white"/></svg>',className:'',iconAnchor:[11,34],popupAnchor:[0,-34]});}
+
+// =============================================================================
+// DROPDOWNS
+// =============================================================================
+function buildDDs(){
+  fillDD('dd-area',uniq(BIZD.map(function(r){return r.area;})),'area');
+  fillDD('dd-type',uniq(BIZD.map(function(r){return r.type;})),'type');
+  fillDD('dd-svc',uniq(BIZD.reduce(function(a,r){return a.concat(r.services.split(',').map(function(s){return s.trim();}));},[])),'svc');
+  fillDD('dd-medium',uniq(ARTD.map(function(r){return r.medium;})),'medium');
+}
+function fillDD(id,opts,key){
+  var dd=document.getElementById(id),ei=dd.querySelector('input');dd.innerHTML='';if(ei)dd.appendChild(ei);
+  var all=mko('All',true);
+  all.onclick=function(e){e.stopPropagation();filt[key]='';dd.querySelectorAll('.opt').forEach(function(o){o.classList.remove('sel');});all.classList.add('sel');applyFilters();updBtn(key,'');};
+  dd.appendChild(all);
+  opts.forEach(function(o){var el=mko(o,false);el.onclick=function(e){e.stopPropagation();filt[key]=o;dd.querySelectorAll('.opt').forEach(function(x){x.classList.remove('sel');});el.classList.add('sel');applyFilters();updBtn(key,o);};dd.appendChild(el);});
+}
+function mko(t,s){var d=document.createElement('div');d.className='opt'+(s?' sel':'');d.textContent=t;return d;}
+function updBtn(key,val){
+  var lb={name:'Business Name',area:'Area',type:'Business Type',svc:'Service Options',artist:'Artist',medium:'Medium'};
+  var btn=document.getElementById('fb-'+key);if(!btn)return;
+  btn.childNodes[0].textContent=(val||lb[key])+' ';
+  btn.classList.toggle('on',!!val);
+}
+function toggleDD(key,e){
+  e.stopPropagation();
+  ['name','area','type','svc','artist','medium'].forEach(function(k){
+    var d=document.getElementById('dd-'+k);if(d)d.classList.toggle('open',k===key&&!d.classList.contains('open'));
+  });
+}
+document.addEventListener('click',function(){document.querySelectorAll('.dd').forEach(function(d){d.classList.remove('open');});});
+
+// =============================================================================
+// FILTERS
+// =============================================================================
+function applyFilters(){
+  hlRow=-1;
+  if(curTab==='biz'){
+    var nq=(document.getElementById('name-inp')||{}).value||'';
+    filtBiz=BIZD.filter(function(r){
+      return(!nq||r.name.toLowerCase().indexOf(nq.toLowerCase())>-1)&&
+             (!filt.area||r.area===filt.area)&&
+             (!filt.type||r.type===filt.type)&&
+             (!filt.svc||r.services.indexOf(filt.svc)>-1);
+    });
+    renderBizMarkers();renderBizTable();
+  }else{
+    var aq=(document.getElementById('artist-inp')||{}).value||'';
+    filtArt=ARTD.filter(function(r){
+      return(!aq||r.artist.toLowerCase().indexOf(aq.toLowerCase())>-1)&&
+             (!filt.medium||r.medium===filt.medium);
+    });
+    renderArtMarkers();renderArtTable();
+  }
+}
+function clearFilters(){
+  filt={name:'',area:'',type:'',svc:'',artist:'',medium:''};
+  ['name-inp','artist-inp'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  document.querySelectorAll('.opt').forEach(function(o){o.classList.remove('sel');});
+  document.querySelectorAll('.f-wrap .opt:first-child').forEach(function(o){o.classList.add('sel');});
+  ['name','area','type','svc','artist','medium'].forEach(function(k){updBtn(k,'');});
+  applyFilters();
+}
+
+// =============================================================================
+// RENDER
+// =============================================================================
+function renderBizMarkers(){
+  bizLayer.clearLayers();bizMarkers=[];
+  filtBiz.forEach(function(r,i){
+    var m=L.marker([r.lat,r.lng],{icon:pin(pc(r.area))});
+    var ih=r.img?'<img src="'+r.img+'" class="pop-img" onerror="this.remove()">':'';
+    var d=dom(r.url);
+    m.bindPopup('<div style="min-width:170px">'+ih+'<b style="font-size:12px;display:block;margin-bottom:2px">'+r.name+'</b>'+'<span style="font-size:10px;color:#666">'+r.type+(r.area?' · '+r.area:'')+'</span>'+'<br><span style="font-size:10px;color:#888">'+r.addr+'</span>'+(r.phone?'<br><span style="font-size:10px">'+r.phone+'</span>':'')+(d?'<br><a href="'+r.url+'" target="_blank" style="font-size:10px;color:#2563a8">'+d+'</a>':'')+'</div>',{maxWidth:220});
+    m.on('click',function(){hlBiz(i);});
+    bizLayer.addLayer(m);bizMarkers.push(m);
+  });
+}
+function renderBizTable(){
+  // Fixed layout with defined column widths for the wider biz table
+  var t=document.getElementById('main-table');
+  var cg=document.getElementById('main-colgroup');
+  t.style.tableLayout='fixed';
+  cg.innerHTML='<col style="width:58px"><col style="width:160px"><col style="width:120px"><col style="width:140px"><col style="width:110px"><col style="width:100px"><col style="width:120px"><col>';
+  ss('rcount',filtBiz.length+' / '+BIZD.length+' businesses');
+  ss('biz-count',filtBiz.length);
+  document.getElementById('thead').innerHTML='<tr><th>Image</th><th>Business Name</th><th>Area</th><th>Address</th><th>Contact</th><th>Type</th><th>Website</th><th>Services</th></tr>';
+  var tbody=document.getElementById('tbody');tbody.innerHTML='';
+  filtBiz.forEach(function(r,i){
+    var tr=document.createElement('tr');if(i===hlRow)tr.classList.add('hl');
+    // fixed-size image cell — no layout shift
+    var tc=document.createElement('td');tc.className='ic';
+    var bx=document.createElement('div');bx.className='ib';
+    var ph=document.createElement('div');ph.className='ph';ph.textContent=r.type;bx.appendChild(ph);
+    if(r.img){var img=document.createElement('img');img.dataset.src=r.img;img.alt=r.type;bx.appendChild(img);setTimeout(function(){if(obs)obs.observe(img);},0);}
+    tc.appendChild(bx);tr.appendChild(tc);
+    var d=dom(r.url);
+    tr.insertAdjacentHTML('beforeend',
+      '<td style="font-weight:500">'+r.name+'</td>'+
+      '<td style="color:#555">'+( r.area||'—')+'</td>'+
+      '<td>'+r.addr+'</td>'+
+      '<td>'+r.phone+'</td>'+
+      '<td><span class="badge bb">'+r.type+'</span></td>'+
+      '<td>'+(d?'<a href="'+r.url+'" target="_blank" onclick="event.stopPropagation()">'+d+'</a>':'')+'</td>'+
+      '<td class="wrap" style="color:#555">'+r.services+'</td>');
+    tr.addEventListener('click',function(){hlBiz(i);map.setView([r.lat,r.lng],16,{animate:true});if(bizMarkers[i])bizMarkers[i].openPopup();});
+    tbody.appendChild(tr);
+  });
+}
+function hlBiz(i){hlRow=i;document.querySelectorAll('#tbody tr').forEach(function(tr,idx){tr.classList.toggle('hl',idx===i);});var rows=document.querySelectorAll('#tbody tr');if(rows[i])rows[i].scrollIntoView({behavior:'smooth',block:'nearest'});}
+
+function renderArtMarkers(){
+  artLayer.clearLayers();artMarkers=[];
+  filtArt.forEach(function(r,i){
+    var m=L.marker([r.lat,r.lng],{icon:pin('#6A1B9A')});
+    m.bindPopup('<div style="min-width:170px"><b style="font-size:12px;display:block;margin-bottom:2px">'+r.title+'</b><span style="font-size:10px;color:#666">'+r.medium+' · '+r.artist+'</span>'+(r.year?'<br><span style="font-size:10px;color:#888">Year: '+r.year+'</span>':'')+'<br><span style="font-size:10px;color:#888">'+r.addr+'</span></div>',{maxWidth:220});
+    m.on('click',function(){hlArt(i);});
+    artLayer.addLayer(m);artMarkers.push(m);
+  });
+}
+function renderArtTable(){
+  // Auto layout — columns size to their content, artist name gets full room
+  var t=document.getElementById('main-table');
+  var cg=document.getElementById('main-colgroup');
+  t.style.tableLayout='auto';
+  cg.innerHTML='';
+  ss('rcount',filtArt.length+' / '+ARTD.length+' artworks');
+  ss('art-count',filtArt.length);
+  document.getElementById('thead').innerHTML='<tr><th>Artist</th><th>Title</th><th>Medium</th><th>Year</th><th>Address</th></tr>';
+  var tbody=document.getElementById('tbody');tbody.innerHTML='';
+  filtArt.forEach(function(r,i){
+    var tr=document.createElement('tr');if(i===hlRow)tr.classList.add('hl');
+    tr.innerHTML='<td style="font-weight:500">'+r.artist+'</td><td>'+r.title+'</td><td><span class="badge ba">'+r.medium+'</span></td><td style="white-space:nowrap">'+(r.year||'—')+'</td><td style="color:#555">'+r.addr+'</td>';
+    tr.addEventListener('click',function(){hlArt(i);map.setView([r.lat,r.lng],16,{animate:true});if(artMarkers[i])artMarkers[i].openPopup();});
+    tbody.appendChild(tr);
+  });
+}
+function hlArt(i){hlRow=i;document.querySelectorAll('#tbody tr').forEach(function(tr,idx){tr.classList.toggle('hl',idx===i);});var rows=document.querySelectorAll('#tbody tr');if(rows[i])rows[i].scrollIntoView({behavior:'smooth',block:'nearest'});}
+
+function switchTab(tab){
+  curTab=tab;hlRow=-1;
+  document.getElementById('tab-biz').classList.toggle('active',tab==='biz');
+  document.getElementById('tab-art').classList.toggle('active',tab==='art');
+  document.getElementById('biz-filters').style.display=tab==='biz'?'flex':'none';
+  document.getElementById('art-filters').style.display=tab==='art'?'flex':'none';
+  if(tab==='biz'){map.removeLayer(artLayer);map.addLayer(bizLayer);}
+  else{map.removeLayer(bizLayer);map.addLayer(artLayer);}
+  applyFilters();
+}
+
+// Init after full page load so map div has real dimensions
+window.addEventListener('load',function(){
+  initMap();
+  // Support ?tab=art or #art in the URL to default to the art tab
+  var hash = window.location.hash.replace('#','');
+  var param = new URLSearchParams(window.location.search).get('tab');
+  if(hash === 'art' || param === 'art'){ switchTab('art'); }
+});
+</script>
+</body>
+</html>
